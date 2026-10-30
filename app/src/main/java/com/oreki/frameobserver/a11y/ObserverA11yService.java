@@ -53,6 +53,17 @@ public class ObserverA11yService extends AccessibilityService {
     /** 事件速率上限：超过就丢弃（游戏高刷屏上 TYPE_WINDOW_CONTENT_CHANGED 可以刷到上千/秒）。 */
     private static final int MAX_EVENTS_PER_SEC = 200;
 
+    /**
+     * 自动快照的最大深度。
+     *
+     * <p>早期固定 12，实测**会把游戏的正文全部切掉**：游戏的内容区在第 13~18 层，
+     * 深度 12 的节点 {@code children} 恒为空数组，于是 32 个节点里只有 1 个带文字，
+     * 「还原弹了什么」这个用途完全失效。24 层能覆盖绝大多数页面，
+     * 又不至于在自动快照上花太多时间（自动快照是每个窗口切换都要跑一次的）。
+     * 需要更深时用 {@code GET /ui?depth=48}。
+     */
+    private static final int AUTO_DUMP_MAX_DEPTH = 24;
+
     private final ArrayDeque<Long> recent = new ArrayDeque<>();
     private long enabledAt;
 
@@ -77,9 +88,131 @@ public class ObserverA11yService extends AccessibilityService {
     private int shotCount;
     private final java.util.Map<String, Long> lastShotAt = new java.util.HashMap<>();
 
+    /**
+     * 当前连接的服务实例。
+     *
+     * <p>为什么需要它：{@code GET /ui} 是**需求驱动**的即时控件树查询，
+     * 只有无障碍服务本身能调 {@code getRootInActiveWindow()}。HTTP 服务与它在同一个进程里，
+     * 拿一个静态引用比走 Binder 便宜得多。
+     *
+     * <p>这是「观测」而不是「操作」：本字段只被 /ui 用来**读**当前窗口，
+     * 不参与任何 performAction。
+     */
+    private static volatile ObserverA11yService instance;
+
+    /** HTTP 侧取实例；未连接时返回 null（调用方负责回 503）。 */
+    public static ObserverA11yService get() {
+        return instance;
+    }
+
+    /**
+     * 需求驱动的即时控件树。
+     *
+     * <p>为什么要有它：{@code uiautomator dump} 在游戏这种持续动画的画面上会
+     * {@code ERROR: could not get idle state}，**连文件都不写**，整条 UI 验证链就断了。
+     * 无障碍服务不需要等 idle，直接读当前窗口即可。
+     *
+     * @param maxDepth 最大深度（uiautomator 默认递归到底；这里默认 48 足够覆盖游戏的 15~20 层）
+     * @param maxNodes 节点预算
+     * @param flat     true = 只回「有文字或可点」的扁平列表（体积小、直接能用）；
+     *                 false = 回完整嵌套树（保留结构）
+     * @return JSON 字符串；拿不到窗口时返回 null
+     */
+    public String dumpActiveTree(int maxDepth, int maxNodes, boolean flat) {
+        AccessibilityNodeInfo root;
+        try {
+            root = getRootInActiveWindow();
+        } catch (Exception e) {
+            return null;
+        }
+        if (root == null) {
+            return null;
+        }
+        int[] budget = {maxNodes};
+        try {
+            if (flat) {
+                java.util.List<String> items = new java.util.ArrayList<>();
+                nodeFlat(root, items, 0, maxDepth, budget);
+                StringBuilder sb = new StringBuilder(4096);
+                sb.append('[');
+                for (int i = 0; i < items.size(); i++) {
+                    if (i > 0) {
+                        sb.append(',');
+                    }
+                    sb.append(items.get(i));
+                }
+                sb.append(']');
+                return sb.toString();
+            }
+            StringBuilder sb = new StringBuilder(4096);
+            nodeJson(root, sb, 0, budget, maxDepth);
+            return sb.toString();
+        } catch (Exception e) {
+            return null;
+        } finally {
+            try {
+                root.recycle();
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    /** 扁平模式：只收「有文字 / 有描述 / 可点 / 可滚」的节点，顺序即树的先序（≈ 视觉顺序）。 */
+    private void nodeFlat(AccessibilityNodeInfo n, java.util.List<String> out,
+                          int depth, int maxDepth, int[] budget) {
+        if (depth > maxDepth || budget[0] <= 0) {
+            return;
+        }
+        budget[0]--;
+        String id = n.getViewIdResourceName();
+        CharSequence cls = n.getClassName();
+        CharSequence txt = n.isPassword() ? "***" : n.getText();
+        CharSequence desc = n.getContentDescription();
+        boolean clickable = n.isClickable();
+        boolean scrollable = n.isScrollable();
+        if ((txt != null && txt.length() > 0) || (desc != null && desc.length() > 0)
+                || clickable || scrollable) {
+            Rect r = new Rect();
+            n.getBoundsInScreen(r);
+            out.add(Json.obj()
+                    .put("cls", cls == null ? null : simple(cls.toString()))
+                    .put("id", id)
+                    .put("text", cut(txt))
+                    .put("desc", cut(desc))
+                    .put("bounds", r.left + "," + r.top + "," + r.right + "," + r.bottom)
+                    .put("clickable", clickable)
+                    .put("scrollable", scrollable)
+                    .put("depth", depth)
+                    .end());
+        }
+        int children = n.getChildCount();
+        for (int i = 0; i < children; i++) {
+            if (budget[0] <= 0) {
+                break;
+            }
+            AccessibilityNodeInfo c = null;
+            try {
+                c = n.getChild(i);
+                if (c == null) {
+                    continue;
+                }
+                nodeFlat(c, out, depth + 1, maxDepth, budget);
+            } catch (Exception ignored) {
+            } finally {
+                if (c != null) {
+                    try {
+                        c.recycle();
+                    } catch (Exception ignored) {
+                    }
+                }
+            }
+        }
+    }
+
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
+        instance = this;
         AccessibilityServiceInfo info = getServiceInfo();
         if (info != null) {
             info.flags |= AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
@@ -213,9 +346,9 @@ public class ObserverA11yService extends AccessibilityService {
             return;
         }
         StringBuilder sb = new StringBuilder(2048);
-        int[] budget = {400};
+        int[] budget = {500};
         try {
-            nodeJson(root, sb, 0, budget);
+            nodeJson(root, sb, 0, budget, AUTO_DUMP_MAX_DEPTH);
         } catch (Exception ignored) {
         } finally {
             try {
@@ -290,8 +423,9 @@ public class ObserverA11yService extends AccessibilityService {
         return null;
     }
 
-    private void nodeJson(AccessibilityNodeInfo n, StringBuilder sb, int depth, int[] budget) {
-        if (depth > 12 || budget[0] <= 0) {
+    private void nodeJson(AccessibilityNodeInfo n, StringBuilder sb, int depth, int[] budget,
+                          int maxDepth) {
+        if (depth > maxDepth || budget[0] <= 0) {
             sb.append("null");
             return;
         }
@@ -317,7 +451,7 @@ public class ObserverA11yService extends AccessibilityService {
                     kids.append(',');
                 }
                 first = false;
-                nodeJson(c, kids, depth + 1, budget);
+                nodeJson(c, kids, depth + 1, budget, maxDepth);
             } catch (Exception ignored) {
                 // 单个子节点取不到就当它不存在，不影响整棵树
             } finally {
@@ -395,6 +529,7 @@ public class ObserverA11yService extends AccessibilityService {
                 .put("uptime_ms", (System.nanoTime() - enabledAt) / 1_000_000L)
                 .end());
         SessionLog.flush();
+        instance = null;
         return super.onUnbind(intent);
     }
 

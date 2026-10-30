@@ -80,11 +80,17 @@ JSONL 而非 JSON 数组：录制被强杀或断电时，数组写法整份作�
 | `GET /snapshot.jpg` | 最新一帧，响应头带 `X-Frame-Id` / `X-Frame-Mono-Ns` / `X-Frame-Source-Ns` |
 | `GET /stats` | 统计 JSON（目标/实际 FPS 分开报告） |
 | `GET /events?since=N` | 第 N 条之后的无障碍事件（JSONL 文本） |
+| `GET /ui?depth=48&max=3000&flat=1` | **即时控件树**（有文字 / 可点的节点 + bounds），不需要等 idle |
 | `GET /frames/f_000123.jpg` | 历史帧 |
 | `GET /frame_at?t=<ns>` | **指定时间点回放**：按 CLOCK_MONOTONIC 时刻找最近一帧（`&raw=1` 直出 JPEG） |
 | `GET /ws` | WebSocket：binary=JPEG 帧（≤12.5Hz），text=事件增量 |
 | `POST /capture/stop` | 停止采集 |
 | `POST /capture/record?on=0|1` | 切换落盘 |
+
+> `/ui` 是为绕开 `uiautomator dump` 的硬限制加的：在持续动画的画面上 uiautomator 会
+> `ERROR: could not get idle state`，而且**连 XML 文件都不写**。无障碍服务不需要等 idle。
+> `flat=1` 只回「有文字 / 有描述 / 可点 / 可滚」的节点，体积小且直接能用来点；
+> `flat=0` 回完整嵌套树。深度默认 48（uiautomator 递归到底；早期固定 12 会把游戏正文整段切掉）。
 
 **刻意不提供 `POST /capture/start`**：投影授权必须由人在设备上确认，
 提供远程触发接口等于绕过系统授权流程。

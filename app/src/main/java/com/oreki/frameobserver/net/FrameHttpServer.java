@@ -44,6 +44,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   GET  /snapshot.jpg      最新一帧 JPEG（no-store）
  *   GET  /stats             统计 JSON
  *   GET  /events?since=N    无障碍事件，返回第 N 条之后的部分（JSONL 文本）
+ *   GET  /ui?depth=48&max=3000&flat=1  即时控件树（不需要 idle，动画中也能读）
  *   GET  /frames/&lt;id&gt;.jpg   历史帧
  *   GET  /ws                WebSocket：服务端推二进制 JPEG 帧 + 文本事件
  *   POST /capture/stop      停止采集
@@ -227,6 +228,43 @@ public final class FrameHttpServer {
                             + ",\"session\":" + quote(FrameBus.sessionDir == null ? "" : FrameBus.sessionDir.getAbsolutePath())
                             + "}");
             writeText(out, 200, "application/json; charset=utf-8", body);
+            return;
+        }
+        if ("GET".equals(method) && "/ui".equals(path)) {
+            // 需求驱动的即时控件树。存在的理由：`uiautomator dump` 在持续动画的画面上
+            // 会 "ERROR: could not get idle state" 且**不写文件**，整条 UI 验证链会断。
+            // 无障碍服务不需要等 idle。
+            int depth = 48;
+            int max = 3000;
+            boolean flat = true;
+            for (String kv : query.split("&")) {
+                try {
+                    if (kv.startsWith("depth=")) {
+                        depth = Math.max(1, Math.min(64, Integer.parseInt(kv.substring(6))));
+                    } else if (kv.startsWith("max=")) {
+                        max = Math.max(1, Math.min(5000, Integer.parseInt(kv.substring(4))));
+                    } else if (kv.equals("flat=0")) {
+                        flat = false;
+                    } else if (kv.equals("flat=1")) {
+                        flat = true;
+                    }
+                } catch (NumberFormatException ignored) {
+                }
+            }
+            com.oreki.frameobserver.a11y.ObserverA11yService svc =
+                    com.oreki.frameobserver.a11y.ObserverA11yService.get();
+            if (svc == null) {
+                writeText(out, 503, "text/plain; charset=utf-8",
+                        "无障碍服务未连接（设置里启用 ObserverA11yService 后再试）");
+                return;
+            }
+            String tree = svc.dumpActiveTree(depth, max, flat);
+            if (tree == null) {
+                writeText(out, 503, "text/plain; charset=utf-8",
+                        "拿不到当前窗口（屏幕已锁 / 无活动窗口）");
+                return;
+            }
+            writeText(out, 200, "application/json; charset=utf-8", tree);
             return;
         }
         if ("GET".equals(method) && "/events".equals(path)) {
@@ -663,6 +701,7 @@ public final class FrameHttpServer {
                 + "<li><code>/snapshot.jpg</code> 最新一帧</li>"
                 + "<li><code>/stats</code> 统计 JSON</li>"
                 + "<li><code>/events?since=0</code> 无障碍事件</li>"
+                + "<li><code>/ui</code> 即时控件树（动画中也能读，替代 uiautomator dump）</li>"
                 + "<li><code>/frames/f_000001.jpg</code> 历史帧</li>"
                 + "<li><code>/ws</code> WebSocket 实时流</li>"
                 + "</ul>";
