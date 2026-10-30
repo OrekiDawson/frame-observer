@@ -1,0 +1,13 @@
+/*
+ * Oreki Frame Observer —— 根构建脚本
+ *
+ * 设计取舍：
+ *   本工具是**测试基础设施**，不修改 AD 游戏的生产逻辑，也不依赖任何 AndroidX / Kotlin
+ *   运行时。全部界面与逻辑用 framework API 手写，好处是：
+ *     1) 不需要任何第三方依赖，离线命令行构建只需要 android.jar + build-tools；
+ *     2) APK 体积小，冷启动快，对被测游戏的 CPU 抢占最小；
+ *     3) 不存在依赖版本漂移导致的「上次能编，这次编不过」。
+ */
+plugins {
+    id 'com.android.application' version '8.7.3' apply false
+}

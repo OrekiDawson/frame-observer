@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Oreki Frame Observer</string>
+    <string name="a11y_label">Oreki Frame Observer 界面观测</string>
+    <string name="a11y_desc">仅用于读取被测应用的界面事件与控件树，不执行任何自动化操作，不采集其他应用的私人内容。</string>
+</resources>

@@ -1,0 +1,24 @@
+/*
+ * Oreki Frame Observer —— Gradle 设置
+ * 说明：本工程是**标准 AGP 工程**，可以用 Android Studio 直接打开。
+ * 但仓库同时提供完全离线的命令行构建脚本 tools/build_cli.py（aapt2 + javac + d8 +
+ * zipalign + apksigner），用于在没有网络 / 没有 Gradle 插件缓存的环境下出包。
+ * 两者产物等价，脚本差异见 docs/构建说明.md。
+ */
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.name = "OrekiFrameObserver"
+include ":app"

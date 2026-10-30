@@ -1,0 +1,59 @@
+/*
+ * app 模块构建脚本（AGP 路径）
+ *
+ * 关键点：
+ *   - 不用 AndroidX（android.useAndroidX=false），所以 java 源码只 import android.* / java.*；
+ *   - minSdk 29：MediaProjection + foregroundServiceType 的稳定基线；Android 14 是验收目标；
+ *   - targetSdk 34：必须声明 FOREGROUND_SERVICE_MEDIA_PROJECTION，否则 startForeground 抛
+ *     SecurityException；
+ *   - 签名：优先用仓库内 keys/oreki.jks（与 AD 测试包同一把钥匙，便于统一装机流程），
+ *     找不到时退回 debug 签名。
+ */
+plugins {
+    id 'com.android.application'
+}
+
+def repoRoot = rootDir
+def sharedKeystore = new File(repoRoot, '../android/AD_Oreki_Edition_Android/keys/oreki.jks')
+
+android {
+    namespace 'com.oreki.frameobserver'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.oreki.frameobserver"
+        minSdk 29
+        targetSdk 34
+        versionCode 1
+        versionName "0.1.0"
+    }
+
+    signingConfigs {
+        if (sharedKeystore.exists()) {
+            oreki {
+                storeFile sharedKeystore
+                storePassword 'oreki2026'
+                keyAlias 'oreki'
+                keyPassword 'oreki2026'
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (sharedKeystore.exists()) {
+                signingConfig signingConfigs.oreki
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+
+    lint {
+        abortOnError false
+    }
+}

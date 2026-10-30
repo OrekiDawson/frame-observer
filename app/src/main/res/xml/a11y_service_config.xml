@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  无障碍服务配置 —— 只观测，不代理。
+
+  关键项说明：
+    accessibilityEventTypes="typeAllMask"
+        需要拿到「窗口状态变化」(typeWindowStateChanged)、「内容变化」
+        (typeWindowContentChanged)、「点击」(typeViewClicked)、「滚动」(typeViewScrolled)。
+        逐类枚举容易漏，且游戏自定义 View 的上报类型不固定，所以全收，再在
+        ObserverA11yService#shouldLog 里按包名白名单过滤。
+
+    canRetrieveWindowContent="true"
+        取控件树必需。仅对被白名单包名生效。
+
+    accessibilityFlags
+        flagReportViewIds             —— 拿到 viewIdResourceName，控件树才有意义
+        flagIncludeNotImportantViews  —— 游戏自绘 View 常被标 not important，不包含就取不到
+        flagRetrieveInteractiveWindows—— 多窗口场景下取到当前活动窗口
+
+    notificationTimeout="50"
+        事件合并窗口 50ms。设 0 会放大事件量、明显增加开销；设太大则丢事件时序。
+        50ms 足够保留「点击 → 画面变化」的先后关系。
+
+  刻意**不**设置：
+    canPerformGestures / canRequestTouchExplorationMode —— 本工具只观测，
+    不提供任何代替用户操作的通道（安全要求：不作为自动化/点击注入工具）。
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeAllMask"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagReportViewIds|flagIncludeNotImportantViews|flagRetrieveInteractiveWindows"
+    android:canRetrieveWindowContent="true"
+    android:description="@string/a11y_desc"
+    android:notificationTimeout="50" />

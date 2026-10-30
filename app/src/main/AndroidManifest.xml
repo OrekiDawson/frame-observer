@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Oreki Frame Observer —— 清单
+
+  权限说明（每一条都对应一个真实用途，不申请用不到的权限）：
+    FOREGROUND_SERVICE + FOREGROUND_SERVICE_MEDIA_PROJECTION
+        Android 14 起，持有 MediaProjection 的服务**必须**以 mediaProjection 类型前台运行，
+        否则 startForeground() 直接抛 SecurityException。这两个权限不是可选项。
+    POST_NOTIFICATIONS
+        Android 13+ 前台服务通知需要用户授权，否则通知不显示（服务仍运行）。
+    INTERNET
+        本机回环 HTTP / WebSocket 服务，供 WorkBuddy 通过 adb forward 读取画面。
+        不对外网发起任何连接。
+
+  刻意**不**申请的权限：
+    READ/WRITE_EXTERNAL_STORAGE —— 数据全部写在 app-specific 外部目录，无需存储权限；
+    SYSTEM_ALERT_WINDOW —— 不需要悬浮窗；
+    RECORD_AUDIO —— 只采画面，不采声音。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@android:drawable/sym_def_app_icon"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.DeviceDefault.Light"
+        android:usesCleartextTraffic="true">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          exported=false：只允许本应用启动。MediaProjection 的 resultData 是敏感令牌，
+          不允许外部应用通过 Intent 注入。
+          foregroundServiceType=mediaProjection：Android 14 硬性要求。
+        -->
+        <service
+            android:name=".CaptureService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
+
+        <!--
+          无障碍服务：只用于**观测**被测游戏的界面事件与控件树，不执行任何自动化操作。
+          真正的操作接口（performAction）留空未接线，避免被误当成自动化通道。
+        -->
+        <service
+            android:name=".a11y.ObserverA11yService"
+            android:exported="true"
+            android:label="@string/a11y_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/a11y_service_config" />
+        </service>
+
+    </application>
+</manifest>
