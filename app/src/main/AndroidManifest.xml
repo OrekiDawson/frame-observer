@@ -17,12 +17,25 @@
     SYSTEM_ALERT_WINDOW —— 不需要悬浮窗；
     RECORD_AUDIO —— 只采画面，不采声音。
 -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!--
+      WRITE_SECURE_SETTINGS
+        只用于一件事：把 ENABLED_ACCESSIBILITY_SERVICES 写回去。
+        `adb shell am force-stop` 会清空这个设置项（实测），之后 /ui 永久 503，
+        只能人工进设置里重开。有了这条权限，启动时就能自愈。
+        普通安装不会被授予（signature|privileged|development），
+        需要用 `adb shell pm grant` 针对 debuggable 包单独授予；
+        没授予时自愈失败会被吞掉并记日志，不影响其它功能。
+    -->
+    <uses-permission
+        android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
 
     <application
         android:allowBackup="false"

@@ -225,6 +225,9 @@ public final class FrameHttpServer {
                             .end()
                             + ",\"state\":" + quote(FrameBus.state)
                             + ",\"capturing\":" + FrameBus.capturing
+                            // 无障碍绑定状态：让调用方一眼看出 /ui 会不会失败，
+                            // 不用等请求 /ui 拿到 503 才回头排查。
+                            + ",\"a11y\":" + quote(com.oreki.frameobserver.a11y.A11yBinder.state(appContext))
                             + ",\"session\":" + quote(FrameBus.sessionDir == null ? "" : FrameBus.sessionDir.getAbsolutePath())
                             + "}");
             writeText(out, 200, "application/json; charset=utf-8", body);
@@ -254,8 +257,22 @@ public final class FrameHttpServer {
             com.oreki.frameobserver.a11y.ObserverA11yService svc =
                     com.oreki.frameobserver.a11y.ObserverA11yService.get();
             if (svc == null) {
-                writeText(out, 503, "text/plain; charset=utf-8",
-                        "无障碍服务未连接（设置里启用 ObserverA11yService 后再试）");
+                // 自愈一次：`am force-stop` 会把 Settings 里的无障碍绑定清空，
+                // 这时干等不会恢复，先试着自己写回去（缺权限会在内部被吞掉并记日志）。
+                com.oreki.frameobserver.a11y.A11yBinder.ensureBound(appContext);
+                svc = com.oreki.frameobserver.a11y.ObserverA11yService.get();
+            }
+            if (svc == null) {
+                // 仍然连不上：返回结构化错误体，把「现在什么状态、下一步跑什么命令」
+                // 直接带出去，避免调用方只看到一句无法行动的 503。
+                String st = com.oreki.frameobserver.a11y.A11yBinder.state(appContext);
+                writeText(out, 503, "application/json; charset=utf-8", Json.obj()
+                        .put("error", "a11y_not_connected")
+                        .put("state", st)
+                        .put("hint", "无障碍服务未连接，/ui 不可用；"
+                                + "此时可用 `adb shell uiautomator dump` 兜底取控件树")
+                        .put("fix", com.oreki.frameobserver.a11y.A11yBinder.fixCommands())
+                        .end());
                 return;
             }
             String tree = svc.dumpActiveTree(depth, max, flat);

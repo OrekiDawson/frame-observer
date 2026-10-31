@@ -98,6 +98,35 @@ JSONL 而非 JSON 数组：录制被强杀或断电时，数组写法整份作�
 **刻意不提供 `POST /capture/start`**：投影授权必须由人在设备上确认，
 提供远程触发接口等于绕过系统授权流程。
 
+### 无障碍绑定自愈（2026-10-31 新增）
+
+**问题**：`adb shell am force-stop com.oreki.frameobserver` 会把
+`Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES` **清成 `null`**、
+`ACCESSIBILITY_ENABLED` 变成 `0`。之后 `/ui` 永远返回 503「无障碍服务未连接」，
+只能人工进设置里重新打开。
+
+**改法**：新增 `a11y/A11yBinder.java`，在 `MainActivity.onCreate` 与 `/ui` 失败路径各自愈一次：
+
+| 方法 | 作用 |
+|---|---|
+| `state(ctx)` | 返回 `connected` / `notconnected` / `missing` / `disabled` / `unknown` |
+| `ensureBound(ctx)` | 只在 `missing` / `disabled` 时写回绑定；`notconnected` 不动（避免打断正在进行的绑定） |
+| `fixCommands()` | 返回可直接执行的修复命令，写进 `/ui` 错误体 |
+
+**配套改动**：
+- `/stats` 新增 `a11y` 字段（值为 `{"v":"<state>"}`，与既有 `state` / `session` 的编码约定一致），
+  不必等 `/ui` 失败就能看出无障碍是否可用。
+- `/ui` 在服务未连接时改为返回**结构化 JSON**（`error` / `state` / `hint` / `fix`），
+  HTTP 仍是 503，但把「下一步跑什么命令」直接带出来。
+- 清单新增 `WRITE_SECURE_SETTINGS`（`tools:ignore="ProtectedPermissions"`）。
+  普通安装不会授予，需 `adb shell pm grant com.oreki.frameobserver android.permission.WRITE_SECURE_SETTINGS`；
+  未授予时自愈失败被吞掉并记 `OrekiA11y` 日志，不影响其它功能。**投影授权不受影响，仍需人工确认。**
+
+**实测（AVD `emulator-5554`，2026-10-31 22:05）**：人为把绑定清成 `null` / `0` 后冷启动，
+日志出现 `已写回无障碍绑定: ...ObserverA11yService` → `onCreate ensureBound=true state=notconnected`
+→ 1.2 s 后 `a11y connected`；随后 `/stats` 报 `a11y={"v":"connected"}`、`/ui` 返回 3,259 B 控件树。
+
+
 ## 分辨率口径（必读，避免把降采样当成设备分辨率）
 
 | 概念 | 数值 | 说明 |

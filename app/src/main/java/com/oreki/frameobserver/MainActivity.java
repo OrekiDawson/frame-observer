@@ -81,6 +81,13 @@ public class MainActivity extends Activity implements FrameBus.Listener {
         decodeThread.start();
         decodeHandler = new Handler(decodeThread.getLooper());
 
+        // 无障碍绑定自愈：`am force-stop` 会把 Settings 里的绑定清空，
+        // 不写回去 /ui 永远 503。这里只试一次，失败不阻塞界面
+        // （没授予 WRITE_SECURE_SETTINGS 时必然失败，状态会体现在 /stats 的 a11y 字段）。
+        final boolean bound = com.oreki.frameobserver.a11y.A11yBinder.ensureBound(this);
+        android.util.Log.i("OrekiA11y", "onCreate ensureBound=" + bound
+                + " state=" + com.oreki.frameobserver.a11y.A11yBinder.state(this));
+
         setupSpinner(spScale, new String[]{"1× (原分辨率)", "1/2", "1/3", "1/4"}, 1);
         setupSpinner(spFps, new String[]{"60 fps", "30 fps", "15 fps"}, 0);
         setupSpinner(spQuality, new String[]{"质量 95", "质量 80", "质量 60"}, 1);
