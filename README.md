@@ -205,10 +205,31 @@ K70 面板支持高刷，但本工具在 60 Hz 下运行，任何 120 Hz 结论�
 
 ## 构建
 
+> **前置条件（缺一不可，单独克隆本仓库通常不满足）**
+>
+> `tools/build_cli.py` 是为**本机工作区**写的，它依赖以下三样东西，且路径都是**硬编码**的：
+>
+> | 依赖 | 脚本里的位置 | 说明 |
+> | --- | --- | --- |
+> | Android SDK | `DEFAULT_SDK = C:\Users\Oreki\Android\sdk` | **Windows 绝对路径**。非 Windows 或换机器必须改这一行 |
+> | Build Tools | 优先 `../android/AD_Oreki_Edition_Android/tools/bt/android-14`，其次 `$ANDROID_HOME/build-tools/34.0.0` | 前一个是**相邻 Android 仓库**内的目录，不在本仓库 |
+> | JDK 17 | `../android/AD_Oreki_Edition_Android/tools/jdk/jdk-17.0.20.1+1` | 同样是**相邻仓库**内的工具链 |
+> | 签名密钥 | `../android/AD_Oreki_Edition_Android/keys/oreki.jks` | 同上；口令见 `app/build.gradle` 的 `orekiKsPass`（环境变量 `OREKI_KS_PASS` 或 `keystore/pass.txt`） |
+>
+> 目标 SDK 34、最低 SDK 29。
+>
+> **结论**：只 clone `frame-observer` 这一个仓库**无法直接构建**。要么把相邻的
+> `AD_Oreki_Edition_Android` 一起放在同级目录，要么按上表改掉脚本里的四个路径常量。
+
 两条等价路径：
 
 1. **离线命令行**（推荐，不依赖网络）：`python tools/build_cli.py`
+   —— 用 aapt2 + javac + d8 + zipalign + apksigner 打出可安装 APK，产物在 `_build/`。
+   **完全离线**，不需要 Gradle、不需要网络下载依赖；但**需要上表四样东西**。
 2. **Android Studio / AGP**：直接打开根目录（`com.android.application` 8.7.3）。
+   —— 需要**本机可用的 Gradle 环境与网络**（首次要拉 AGP 与依赖），与路径 1 不是一回事：
+   路径 1 是「四件工具 + Python」，路径 2 是「Gradle + AGP 插件生态」。
+   **不要以为路径 1 能跑就意味着路径 2 也能跑，反之亦然。**
 
 差异说明：AGP 8 禁止清单里的 `package` 属性而 aapt2 又必须有包名，
 命令行脚本在构建期把 `package` 注入到临时清单（`_build/manifest_cli.xml`），仓库清单不动。
