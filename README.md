@@ -187,7 +187,7 @@ K70 面板支持高刷，但本工具在 60 Hz 下运行，任何 120 Hz 结论�
 | `/ui` 超时（`http=000`） | 控件树较大时响应慢 | 放宽 curl 超时（如 `-m 60`），不要用 5 秒级超时判定失败 |
 | `/ui` 报 `could not get idle state` | 直接用 `uiautomator dump` 抓动画界面时的已知限制 | 改用本工具的 `/ui`（不等待 idle） |
 | 截图与控件坐标对不上 | 画面是**半分辨率**、控件树是**物理分辨率** | 见上文「分辨率口径」一节，按 2 倍换算 |
-| `adb forward` 后连不上 | 端口未转发或已被占用 | `adb forward --list` 检查，`adb forward --remove-all` 后重设 `tcp:8731 tcp:8731` |
+| `adb forward` 后连不上 | 端口未转发或已被占用 | 先用 `adb forward --list` 看清现有转发，**只移除本工具的那一条**：`adb forward --remove tcp:8731`，再重新 `adb forward tcp:8731 tcp:8731`。**不要用 `adb forward --remove-all`** —— 它会一并移掉同一 ADB Server 下其他工具的转发 |
 | 授权对话框找不到按钮 | 系统对话框文案随语言变化 | 用 `/ui` 取 bounds 后点击，不要猜坐标；英文环境为 `START NOW`/`CANCEL`，中文为「开始」/「取消」 |
 
 **排查顺序**：`/stats` 看 `capturing` 与 `frames_processed` 是否增长 → `adb forward` 是否在位 →
@@ -226,7 +226,9 @@ app/src/main/java/com/oreki/frameobserver/
 ├── ProcStats.java           CPU / 内存采样（/proc/self/stat + Debug.MemoryInfo）
 ├── util/Json.java           极简 JSON 序列化（单行、稳定字段序）
 ├── net/FrameHttpServer.java HTTP + WebSocket（零依赖，只绑回环）
-└── a11y/ObserverA11yService.java  事件 + 有界控件树 dump
+└── a11y/
+    ├── A11yBinder.java          无障碍绑定与自愈（写回 enabled_accessibility_services）
+    └── ObserverA11yService.java 事件 + 有界控件树 dump
 tools/
 ├── build_cli.py             离线构建（aapt2+javac+d8+zipalign+apksigner）
 └── soak_test.py             30 分钟 soak 采样与判定
