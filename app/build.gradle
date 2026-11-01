@@ -16,6 +16,24 @@ plugins {
 def repoRoot = rootDir
 def sharedKeystore = new File(repoRoot, '../android/AD_Oreki_Edition_Android/keys/oreki.jks')
 
+// [安全修复 2026-11-01] 签名口令不得写入源码。
+// 优先读环境变量 OREKI_KS_PASS；其次读 keystore/pass.txt（该文件必须被 gitignore，不得入库）。
+// 两者都没有时直接失败，而不是用默认口令静默签名。
+def orekiKsPass = {
+    def env = System.getenv("OREKI_KS_PASS")
+    if (env != null && !env.trim().isEmpty()) return env.trim()
+    def f = new File(repoRoot, "keystore/pass.txt")
+    if (f.exists()) return f.text.trim()
+    return null
+}()
+
+if (sharedKeystore.exists() && orekiKsPass == null) {
+    throw new GradleException(
+        "未提供签名口令：请设置环境变量 OREKI_KS_PASS，" +
+        "或在 keystore/pass.txt 写入口令（该文件不得入库）。")
+}
+
+
 android {
     namespace 'com.oreki.frameobserver'
     compileSdk 34
@@ -32,9 +50,9 @@ android {
         if (sharedKeystore.exists()) {
             oreki {
                 storeFile sharedKeystore
-                storePassword 'oreki2026'
+                storePassword orekiKsPass
                 keyAlias 'oreki'
-                keyPassword 'oreki2026'
+                keyPassword orekiKsPass
             }
         }
     }
