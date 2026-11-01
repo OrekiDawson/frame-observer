@@ -177,6 +177,32 @@ K70 面板支持高刷，但本工具在 60 Hz 下运行，任何 120 Hz 结论�
 - 不绕过 FLAG_SECURE / 截图限制；受保护窗口照常变黑。
 - 停止采集即释放 VirtualDisplay / ImageReader / MediaProjection 并退出前台。
 
+## 常见问题与故障排查
+
+| 现象 | 原因 | 处理 |
+| --- | --- | --- |
+| `/stats` 里 `capturing=false` | MediaProjection 授权失效（重启 App、系统回收、切后台过久） | 重新走「开始捕获」→ 系统对话框确认；**工具不提供任何绕过授权的接口** |
+| `/ui` 返回 503 `a11y:"missing"` | 无障碍服务未绑定 | 到系统设置里重新开启本应用的无障碍服务；`am force-stop` 会把 `enabled_accessibility_services` 清成 null，必须重新授权 |
+| 冷启动后 `/ui` 首次必 503 | 无障碍服务尚未绑定完成 | 等绑定完成，或先用 `uiautomator dump` 过渡 |
+| `/ui` 超时（`http=000`） | 控件树较大时响应慢 | 放宽 curl 超时（如 `-m 60`），不要用 5 秒级超时判定失败 |
+| `/ui` 报 `could not get idle state` | 直接用 `uiautomator dump` 抓动画界面时的已知限制 | 改用本工具的 `/ui`（不等待 idle） |
+| 截图与控件坐标对不上 | 画面是**半分辨率**、控件树是**物理分辨率** | 见上文「分辨率口径」一节，按 2 倍换算 |
+| `adb forward` 后连不上 | 端口未转发或已被占用 | `adb forward --list` 检查，`adb forward --remove-all` 后重设 `tcp:8731 tcp:8731` |
+| 授权对话框找不到按钮 | 系统对话框文案随语言变化 | 用 `/ui` 取 bounds 后点击，不要猜坐标；英文环境为 `START NOW`/`CANCEL`，中文为「开始」/「取消」 |
+
+**排查顺序**：`/stats` 看 `capturing` 与 `frames_processed` 是否增长 → `adb forward` 是否在位 →
+无障碍是否绑定 → 再怀疑工具本身。**连续两次走完链路仍失败**才可判定工具不可用，并附 `/stats` 原文与 logcat。
+
+## 与 Oreki Mod 测试流程的关系
+
+本工具是 **Android 端验收的观测通道**，不参与游戏逻辑：
+
+- **用它取证据，再下结论**：Android UI 验收一律先取画面 + 控件树，不允许凭「应该没问题」断言
+- 画面用 `/snapshot.jpg` 确认（**没看图不得断言正常**），控件树用 `/ui`，时序用 `/frame_at`，事件用 `/events`
+- 证据统一落 `android/AD_Oreki_Edition_Android/reports/` 下，便于回查
+- 采集期间**不要为省事 `am force-stop`**；确需重启，先记录原因与当时的 `frames_processed`
+- 工具本身可按需求修改（源码/资源/构建脚本/文档），但**投影授权必须人工确认**这条底线不可改
+
 ## 构建
 
 两条等价路径：
