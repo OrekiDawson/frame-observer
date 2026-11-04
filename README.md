@@ -98,6 +98,55 @@ JSONL 而非 JSON 数组：录制被强杀或断电时，数组写法整份作�
 **刻意不提供 `POST /capture/start`**：投影授权必须由人在设备上确认，
 提供远程触发接口等于绕过系统授权流程。
 
+### Logcat 实时诊断（2026-11-04 新增，R74）
+
+把工具从「只看画面」扩到「画面 + 运行时日志」：`diag/LogcatRecorder.java` 在 app 内
+用 `Runtime.exec("logcat -v threadtime")` 起子进程（不依赖 ADB 在线），
+独立线程读流、固定容量环形缓冲（4000 条，约 0.8 MB），**不阻塞截图与 `/ui`**。
+
+| 端点 | 说明 |
+|---|---|
+| `POST /logcat/start?pkg=` | 启动捕获；带 `pkg` 时按该包名解析 PID 过滤 |
+| `POST /logcat/stop` | 停止并回收子进程 |
+| `POST /logcat/pause?on=1\|0` | 暂停 / 继续（暂停期间不消费、不增长缓冲） |
+| `POST /logcat/clear` | 清空环形缓冲 |
+| `POST /logcat/level?min=0..4` | 等级过滤：0=V 1=D 2=I 3=W 4=E |
+| `POST /logcat/filter?tag=&kw=&pid=&pkg=` | 按 Tag / 关键词 / PID / 包名过滤；**传空串=清该位，不传=保持** |
+| `GET /logcat?limit=&kw=` | 最近 N 条（NDJSON） |
+| `GET /logcat/since?seq=&limit=` | 增量拉取（配合 `last_seq` 轮询） |
+| `GET /logcat/export?jsonl=0\|1` | 导出（文本 / NDJSON） |
+| `GET /logcat/stats` | `running / alive / paused / buffered / last_seq / 过滤条件 / device` |
+| `POST /logcat/rule?cls=&method=&session=` | 注册**临时诊断规则**：把匹配到该类名+方法名的日志归到某个 Session |
+| `POST /logcat/rule/remove?session=` | 移除该 Session 的全部规则 |
+| `GET /logcat/rule` | 列出当前规则 |
+| `GET /timeline?center=&before=&after=` | 以某时刻为中心，取窗口内日志，用于把「点了哪里」和「打了什么」对齐 |
+
+**权限**：需要 `android.permission.READ_LOGS`。装上后要
+`adb shell pm grant com.oreki.frameobserver android.permission.READ_LOGS`，
+**并且**首次 `/logcat/start` 时系统还会弹一次「Allow … to access all device logs?」
+（Android 14 的 `LogAccessDialogActivity`），必须点 **Allow one-time access**。
+不点的话表现是：`running=true`、`alive=true`、但 `buffered` 恒为 0。
+未授权不影响截图 / `/ui` / 点击等既有功能。
+
+**`/timeline` 的时间基准**：`wall_ms` 是**设备本地时区**下的 epoch 毫秒。
+logcat 的 `threadtime` 只给 `MM-dd HH:mm:ss.SSS`（没有年份），
+`LogcatRecorder.parseWall()` 用**设备默认时区**补当前年份再解析；
+跨时区对比时请换算到同一基准（本机 GMT+8 / AVD 默认 GMT 会差 8 小时）。
+
+**已知限制（必须照抄，别当成「完整调用栈」）**：
+- 普通 Logcat **不会**自动给出正常方法的调用栈。要拿到调用栈，必须临时插桩
+  （在目标方法里 `new Throwable().getStackTrace()` 并把结果打进日志），
+  插桩产物**不得进入正式 Release**。
+- 本模块提供的是「日志采集 + 归因 + 时间线」，**不是**自动调用栈追踪器。
+
+**踩过的坑（写进代码注释，避免重犯）**：
+- 不要一次给多个 `-b`（main/system/crash）：Android 13+ 会立刻退出，表现为「进程在、缓冲 0」。
+- 诊断日志**绝不能在读取循环里无条件打印原始行**：打印出的日志会被自己再读回来，
+  形成指数级自我复制，几秒内把 logcat 缓冲打满。只统计数量、结束时汇总一条。
+- JSON 输出不要复用旧的 `quote()`（它返回 `{"v":...}` 包装对象），
+  logcat 端点用独立的 `q()` 生成标准字符串字面量。
+
+
 ### 无障碍绑定自愈（2026-10-31 新增）
 
 **问题**：`adb shell am force-stop com.oreki.frameobserver` 会把

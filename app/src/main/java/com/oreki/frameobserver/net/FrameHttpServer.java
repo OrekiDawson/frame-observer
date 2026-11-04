@@ -26,6 +26,8 @@ import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -284,6 +286,19 @@ public final class FrameHttpServer {
             writeText(out, 200, "application/json; charset=utf-8", tree);
             return;
         }
+        // ---------------------------------------------------------------- logcat 诊断
+        // 这一组端点存在的理由：本工具要能回答「这条日志是谁打出来的 / 这次点击触发了什么」。
+        // 全部为只读或显式控制，不影响截图与点击路径。
+        if (path.startsWith("/logcat")) {
+            if (handleLogcat(method, path, query, out)) {
+                return;
+            }
+        }
+        if ("GET".equals(method) && "/timeline".equals(path)) {
+            writeText(out, 200, "application/json; charset=utf-8", buildTimeline(query));
+            return;
+        }
+
         if ("GET".equals(method) && "/events".equals(path)) {
             int since = 0;
             for (String kv : query.split("&")) {
@@ -677,6 +692,280 @@ public final class FrameHttpServer {
         return any ? sb.toString() : null;
     }
 
+    // ------------------------------------------------------------------ logcat 诊断
+
+    /**
+     * 处理 /logcat 系列端点。
+     *
+     * <pre>
+     *   POST /logcat/start?pkg=...       启动捕获（可带包名过滤）
+     *   POST /logcat/stop                停止捕获
+     *   POST /logcat/pause?on=1|0        暂停 / 继续
+     *   POST /logcat/clear               清空缓冲
+     *   POST /logcat/level?min=0..4      等级过滤（0=V..4=E）
+     *   POST /logcat/filter?tag=&kw=&pid=&pkg=
+     *   GET  /logcat?limit=200&kw=       取最近 N 条（NDJSON）
+     *   GET  /logcat/since?seq=N&kw=     增量拉取
+     *   GET  /logcat/export?jsonl=1      导出
+     *   GET  /logcat/stats               状态
+     *   POST /logcat/rule?cls=&method=&session=
+     *   POST /logcat/rule/remove?session=
+     *   GET  /logcat/rule                列出规则
+     * </pre>
+     *
+     * @return true 表示已处理并写好响应
+     */
+    private boolean handleLogcat(String method, String path, String query, OutputStream out)
+            throws IOException {
+        com.oreki.frameobserver.diag.LogcatRecorder rec =
+                com.oreki.frameobserver.diag.LogcatRecorder.get();
+        Map<String, String> q = parseQueryMap(query);
+
+        if ("POST".equals(method) && "/logcat/start".equals(path)) {
+            boolean ok = rec.start(q.get("pkg"));
+            writeText(out, 200, "application/json; charset=utf-8",
+                    "{\"ok\":" + ok + ",\"running\":" + rec.isRunning() + "}");
+            return true;
+        }
+        if ("POST".equals(method) && "/logcat/stop".equals(path)) {
+            rec.stop();
+            writeText(out, 200, "application/json; charset=utf-8", "{\"ok\":true}");
+            return true;
+        }
+        if ("POST".equals(method) && "/logcat/pause".equals(path)) {
+            boolean on = !"0".equals(q.get("on"));
+            rec.setPaused(on);
+            writeText(out, 200, "application/json; charset=utf-8",
+                    "{\"ok\":true,\"paused\":" + rec.isPaused() + "}");
+            return true;
+        }
+        if ("POST".equals(method) && "/logcat/clear".equals(path)) {
+            rec.clear();
+            writeText(out, 200, "application/json; charset=utf-8", "{\"ok\":true}");
+            return true;
+        }
+        if ("POST".equals(method) && "/logcat/level".equals(path)) {
+            Integer min = parseIntOrNull(q.get("min"));
+            if (min != null) {
+                rec.setMinLevel(min);
+            }
+            writeText(out, 200, "application/json; charset=utf-8",
+                    "{\"ok\":true,\"min\":" + rec.getMinLevel() + "}");
+            return true;
+        }
+        if ("POST".equals(method) && "/logcat/filter".equals(path)) {
+            // 三个过滤位互相独立：传空串 = 清掉这一位，不传 = 保持原样。
+            // 早期写法不管有没有 key 都 set 一次，导致「只想改 keyword」会把 tag 清掉。
+            if (q.containsKey("tag")) {
+                rec.setTagFilter(q.get("tag"));
+            }
+            if (q.containsKey("kw")) {
+                rec.setKeywordFilter(q.get("kw"));
+            }
+            Integer pid = parseIntOrNull(q.get("pid"));
+            if (pid != null && pid > 0) {
+                rec.setPidFilter(pid);
+            } else if ("0".equals(q.get("pid"))) {
+                rec.setPidFilter(0);
+            }
+            if (q.containsKey("pkg")) {
+                rec.setPkgFilter(q.get("pkg"));
+            }
+            writeText(out, 200, "application/json; charset=utf-8", logcatFilterJson(rec));
+            return true;
+        }
+        if ("GET".equals(method) && "/logcat".equals(path)) {
+            int limit = Math.min(2000, Math.max(1, parseInt(q.get("limit"), 200)));
+            Pattern kw = patternOrNull(q.get("kw"));
+            List<com.oreki.frameobserver.diag.LogcatRecorder.Line> lines = rec.tail(limit, kw);
+            writeText(out, 200, "application/x-ndjson; charset=utf-8", rec.exportJsonl(lines));
+            return true;
+        }
+        if ("GET".equals(method) && "/logcat/since".equals(path)) {
+            long seq0 = parseLongVal(q.get("seq"), 0L);
+            int limit = Math.min(2000, Math.max(1, parseInt(q.get("limit"), 500)));
+            Pattern kw = patternOrNull(q.get("kw"));
+            List<com.oreki.frameobserver.diag.LogcatRecorder.Line> lines = rec.since(seq0, kw);
+            if (lines.size() > limit) {
+                lines = lines.subList(0, limit);
+            }
+            writeText(out, 200, "application/x-ndjson; charset=utf-8", rec.exportJsonl(lines));
+            return true;
+        }
+        if ("GET".equals(method) && "/logcat/export".equals(path)) {
+            int limit = Math.min(4000, Math.max(1, parseInt(q.get("limit"), 4000)));
+            boolean jsonl = !"0".equals(q.get("jsonl"));
+            Pattern kw = patternOrNull(q.get("kw"));
+            List<com.oreki.frameobserver.diag.LogcatRecorder.Line> lines = rec.tail(limit, kw);
+            String body = jsonl ? rec.exportJsonl(lines) : rec.exportText(lines);
+            String type = jsonl ? "application/x-ndjson; charset=utf-8" : "text/plain; charset=utf-8";
+            writeText(out, 200, type, body);
+            return true;
+        }
+        if ("GET".equals(method) && "/logcat/stats".equals(path)) {
+            StringBuilder b = new StringBuilder(256);
+            b.append('{')
+             .append("\"running\":").append(rec.isRunning()).append(',')
+             .append("\"alive\":").append(rec.isAlive()).append(',')
+             .append("\"paused\":").append(rec.isPaused()).append(',')
+             .append("\"buffered\":").append(rec.size()).append(',')
+             .append("\"last_seq\":").append(rec.lastSeq()).append(',')
+             .append(logcatFilterJsonBody(rec))
+             .append(",\"device\":").append(q(com.oreki.frameobserver.diag.LogcatRecorder.deviceInfo()))
+             .append('}');
+            writeText(out, 200, "application/json; charset=utf-8", b.toString());
+            return true;
+        }
+        if ("POST".equals(method) && "/logcat/rule".equals(path)) {
+            rec.addRule(q.get("cls"), q.get("method"), q.get("session"));
+            writeText(out, 200, "application/json; charset=utf-8",
+                    "{\"ok\":true,\"rules\":" + rec.rules().size() + "}");
+            return true;
+        }
+        if ("POST".equals(method) && "/logcat/rule/remove".equals(path)) {
+            int n = rec.removeSessionRules(q.get("session"));
+            writeText(out, 200, "application/json; charset=utf-8",
+                    "{\"ok\":true,\"removed\":" + n + "}");
+            return true;
+        }
+        if ("GET".equals(method) && "/logcat/rule".equals(path)) {
+            StringBuilder b = new StringBuilder(128);
+            b.append("{\"rules\":[");
+            boolean first = true;
+            for (com.oreki.frameobserver.diag.LogcatRecorder.DiagRule r : rec.rules()) {
+                if (!first) {
+                    b.append(',');
+                }
+                first = false;
+                b.append("{\"cls\":").append(q(r.cls))
+                 .append(",\"method\":").append(q(r.method))
+                 .append(",\"session\":").append(q(r.session)).append('}');
+            }
+            b.append("]}");
+            writeText(out, 200, "application/json; charset=utf-8", b.toString());
+            return true;
+        }
+        return false;
+    }
+
+    private static String logcatFilterJson(com.oreki.frameobserver.diag.LogcatRecorder rec) {
+        return "{" + logcatFilterJsonBody(rec) + "}";
+    }
+
+    private static String logcatFilterJsonBody(com.oreki.frameobserver.diag.LogcatRecorder rec) {
+        return "\"min_level\":" + rec.getMinLevel()
+                + ",\"pid\":" + rec.getPidFilter()
+                + ",\"tag\":" + q(rec.getTagFilter())
+                + ",\"keyword\":" + q(rec.getKeywordFilter())
+                + ",\"pkg\":" + q(rec.getPkgFilter());
+    }
+
+    /**
+     * /timeline：把「用户交互事件」与「窗口内日志」拼成一条时间线。
+     *
+     * <p>为什么要它：排查「点了没反应」这类问题时，单看日志或单看截图都说不清；
+     * 必须能对齐「这一秒点了哪里」和「这一秒打了什么日志」。
+     */
+    private String buildTimeline(String query) {
+        Map<String, String> q = parseQueryMap(query);
+        long center = parseLongVal(q.get("center"), System.currentTimeMillis());
+        long before = parseLongVal(q.get("before"), 2000L);
+        long after = parseLongVal(q.get("after"), 2000L);
+        long from = center - before;
+        long to = center + after;
+
+        com.oreki.frameobserver.diag.LogcatRecorder rec =
+                com.oreki.frameobserver.diag.LogcatRecorder.get();
+        List<com.oreki.frameobserver.diag.LogcatRecorder.Line> all = rec.tail(4000, null);
+
+        StringBuilder b = new StringBuilder(4096);
+        b.append("{\"from\":").append(from)
+         .append(",\"to\":").append(to)
+         .append(",\"center\":").append(center)
+         .append(",\"logs\":[");
+        boolean first = true;
+        for (com.oreki.frameobserver.diag.LogcatRecorder.Line l : all) {
+            if (l.wallMs < from || l.wallMs > to) {
+                continue;
+            }
+            if (!first) {
+                b.append(',');
+            }
+            first = false;
+            b.append("{\"seq\":").append(l.seq)
+             .append(",\"wall_ms\":").append(l.wallMs)
+             .append(",\"level\":").append(q(l.level))
+             .append(",\"tag\":").append(q(l.tag))
+             .append(",\"pid\":").append(l.pid)
+             .append(",\"text\":").append(q(l.text)).append('}');
+        }
+        b.append("]}");
+        return b.toString();
+    }
+
+    /** 解析 {@code a=1&b=2} 形式的查询串（值做 URL 解码）。 */
+    private static Map<String, String> parseQueryMap(String query) {
+        Map<String, String> m = new java.util.LinkedHashMap<>();
+        if (query == null || query.isEmpty()) {
+            return m;
+        }
+        for (String kv : query.split("&")) {
+            int eq = kv.indexOf('=');
+            if (eq <= 0) {
+                if (!kv.isEmpty()) {
+                    m.put(kv, "");
+                }
+                continue;
+            }
+            String k = kv.substring(0, eq);
+            String v = kv.substring(eq + 1);
+            try {
+                v = java.net.URLDecoder.decode(v, "UTF-8");
+            } catch (Exception ignored) {
+            }
+            m.put(k, v);
+        }
+        return m;
+    }
+
+    private static Integer parseIntOrNull(String s) {
+        if (s == null || s.isEmpty()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(s);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static int parseInt(String s, int def) {
+        Integer v = parseIntOrNull(s);
+        return v == null ? def : v;
+    }
+
+    private static long parseLongVal(String s, long def) {
+        if (s == null || s.isEmpty()) {
+            return def;
+        }
+        try {
+            return Long.parseLong(s);
+        } catch (NumberFormatException e) {
+            return def;
+        }
+    }
+
+    private static Pattern patternOrNull(String s) {
+        if (s == null || s.isEmpty()) {
+            return null;
+        }
+        try {
+            return Pattern.compile(s);
+        } catch (Exception e) {
+            return Pattern.compile(Pattern.quote(s));
+        }
+    }
+
     private static void writeText(OutputStream out, int code, String type, String body) throws IOException {
         byte[] b = body.getBytes(UTF8);
         writeBytes(out, code, type, b, "");
@@ -703,6 +992,40 @@ public final class FrameHttpServer {
 
     private static String quote(String s) {
         return com.oreki.frameobserver.util.Json.obj().put("v", s).end();
+    }
+
+    /**
+     * 标准 JSON 字符串字面量（含两端引号）。
+     *
+     * <p>为什么不复用 {@link #quote}：那个方法返回的是 {@code {"v":...}} 这种「包装对象」，
+     * 是给旧端点拼响应体用的。logcat 端点要的是裸的 JSON 字符串值，
+     * 直接给它拼进 {@code {"tag":...}} 会变成 {@code {"tag":{"v":"x"}}}，
+     * 调用方必须多剥一层，很别扭。这里单独实现，语义清晰、互不影响。
+     */
+    private static String q(String s) {
+        if (s == null) {
+            return "null";
+        }
+        StringBuilder b = new StringBuilder(s.length() + 2);
+        b.append('"');
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"': b.append("\\\""); break;
+                case '\\': b.append("\\\\"); break;
+                case '\n': b.append("\\n"); break;
+                case '\r': b.append("\\r"); break;
+                case '\t': b.append("\\t"); break;
+                default:
+                    if (c < 0x20) {
+                        b.append(String.format(Locale.US, "\\u%04x", (int) c));
+                    } else {
+                        b.append(c);
+                    }
+            }
+        }
+        b.append('"');
+        return b.toString();
     }
 
     private String indexHtml() {

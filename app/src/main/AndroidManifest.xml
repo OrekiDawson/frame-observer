@@ -24,6 +24,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 诊断用：读取 logcat。属于系统级权限，安装后需 `adb shell pm grant` 授予；
+         未授予时 LogcatRecorder.start() 会失败并返回 false，不影响截图/点击。 -->
+    <uses-permission android:name="android.permission.READ_LOGS" />
     <!--
       WRITE_SECURE_SETTINGS
         只用于一件事：把 ENABLED_ACCESSIBILITY_SERVICES 写回去。
