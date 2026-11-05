@@ -53,6 +53,8 @@ SHARED_BT = os.path.join(
     ROOT, "..", "android", "AD_Oreki_Edition_Android", "tools", "bt", "android-14")
 JDK = os.path.join(
     ROOT, "..", "android", "AD_Oreki_Edition_Android", "tools", "jdk", "jdk-17.0.20.1+1")
+KOTLINC_BIN = os.path.join(
+    ROOT, "..", "android", "AD_Oreki_Edition_Android", "tools", "kotlinc", "bin")
 
 
 def log(msg):
@@ -163,15 +165,28 @@ def main():
         "-R", res_zip,
     ])
 
-    # ---------------------------------------------------------------- 3. javac
+    # ---------------------------------------------------------------- 3. Kotlin 编译
+    #
+    # 生产业务实现已全部迁移到 Kotlin（app/src/main/kotlin）。本阶段只做：
+    #   kotlinc → .class → d8 → classes.dex
+    # 不再编译任何 .java 生产源码；`_build/gen` 里由 aapt2 生成的 R.java 也用
+    # kotlinc 一并编译（Kotlin 可直接引用 Java 源，无需先 javac）。
+    kotlinc = find_tool(["kotlinc.bat", "kotlinc"], KOTLINC_BIN)
+    if not kotlinc:
+        die("找不到 kotlinc（期望 %s）" % KOTLINC_BIN)
+    # KOTLINC_BIN 指向 .../tools/kotlinc/bin，stdlib 在 .../tools/kotlinc/lib
+    kotlin_stdlib = os.path.normpath(os.path.join(KOTLINC_BIN, "..", "lib", "kotlin-stdlib.jar"))
+    if not os.path.isfile(kotlin_stdlib):
+        die("找不到 kotlin-stdlib.jar（期望 %s）" % kotlin_stdlib)
+
     sources = []
-    for base in (os.path.join(APP, "src", "main", "java"), os.path.join(BUILD, "gen")):
+    for base in (os.path.join(APP, "src", "main", "kotlin"), os.path.join(BUILD, "gen")):
         for dirpath, _dirnames, filenames in os.walk(base):
             for fn in filenames:
-                if fn.endswith(".java"):
+                if fn.endswith(".kt") or fn.endswith(".java"):
                     sources.append(os.path.join(dirpath, fn))
     if not sources:
-        die("没有找到任何 .java 源文件")
+        die("没有找到任何 .kt 源文件（生产实现必须为 Kotlin）")
     classes = os.path.join(BUILD, "classes")
     # 用 source/target 8 + bootclasspath，而不是 11：
     #   javac 不允许 `-target 11` 配 `-boot-class-path`（会报「目标 11 与选项 --boot-class-path
@@ -182,19 +197,14 @@ def main():
     # core-lambda-stubs.jar 是必须的：android.jar 里没有 java.lang.invoke.LambdaMetafactory，
     # 而 lambda 在 source 8 下编译成 invokedynamic + 对 metafactory 的引用。build-tools 自带
     # 这份桩，必须接在 bootclasspath 后面，否则报「找不到符号 metafactory」。
-    lambda_stubs = os.path.join(bt, "core-lambda-stubs.jar")
-    bcp = android_jar + (os.pathsep + lambda_stubs if os.path.isfile(lambda_stubs) else "")
     run([
-        javac,
-        "-encoding", "UTF-8",
-        "-source", "8", "-target", "8",
-        "-bootclasspath", bcp,
-        "-classpath", bcp,
-        "-d", classes,
+        kotlinc,
         "-nowarn",
-        "-Xlint:-options",
+        "-jvm-target", "11",
+        "-classpath", android_jar,
+        "-d", classes,
     ] + sources)
-    log("javac 编译 %d 个源文件通过" % len(sources))
+    log("kotlinc 编译 %d 个源文件通过" % len(sources))
 
     # ---------------------------------------------------------------- 4. d8
     class_files = []
@@ -204,7 +214,7 @@ def main():
                 class_files.append(os.path.join(dirpath, fn))
     dex_dir = os.path.join(BUILD, "dex")
     run([d8, "--lib", android_jar, "--min-api", MIN_SDK,
-         "--output", dex_dir] + class_files)
+         "--output", dex_dir] + class_files + [kotlin_stdlib])
 
     # ---------------------------------------------------------------- 5. 合并 dex 进 APK
     merged = os.path.join(BUILD, "base.apk")

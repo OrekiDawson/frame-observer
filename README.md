@@ -100,7 +100,7 @@ JSONL 而非 JSON 数组：录制被强杀或断电时，数组写法整份作�
 
 ### Logcat 实时诊断（2026-11-04 新增，R74）
 
-把工具从「只看画面」扩到「画面 + 运行时日志」：`diag/LogcatRecorder.java` 在 app 内
+把工具从「只看画面」扩到「画面 + 运行时日志」：`diag/LogcatRecorder.kt` 在 app 内
 用 `Runtime.exec("logcat -v threadtime")` 起子进程（不依赖 ADB 在线），
 独立线程读流、固定容量环形缓冲（4000 条，约 0.8 MB），**不阻塞截图与 `/ui`**。
 
@@ -154,7 +154,7 @@ logcat 的 `threadtime` 只给 `MM-dd HH:mm:ss.SSS`（没有年份），
 `ACCESSIBILITY_ENABLED` 变成 `0`。之后 `/ui` 永远返回 503「无障碍服务未连接」，
 只能人工进设置里重新打开。
 
-**改法**：新增 `a11y/A11yBinder.java`，在 `MainActivity.onCreate` 与 `/ui` 失败路径各自愈一次：
+**改法**：新增 `a11y/A11yBinder.kt`，在 `MainActivity.onCreate` 与 `/ui` 失败路径各自愈一次：
 
 | 方法 | 作用 |
 |---|---|
@@ -272,14 +272,14 @@ K70 面板支持高刷，但本工具在 60 Hz 下运行，任何 120 Hz 结论�
 
 两条等价路径：
 
-> **构建模式约定（2026-11-04，口径见工作区根 `AGENTS.md` §63）**：
-> 本仓库**没有** Kotlin / AGP 业务依赖，默认走路径 1（完全离线）。路径 2 只在
-> 需要改 AGP 版本或首次拉插件生态时才联网；联网补完必须回到路径 1 验证一次离线可构建。
-> 不受 Android 主仓 §64「全量 Kotlin 化」约束 —— 本仓库是独立诊断工具，没有游戏业务逻辑。
+> **构建模式约定**：本仓库生产实现**全部为 Kotlin**（`app/src/main/kotlin/`），
+> 无 Java 业务源码。日常构建默认走路径 1（完全离线）；路径 2 只在需要改 Kotlin/AGP
+> 版本或首次拉插件生态时才联网，联网补完必须回到路径 1 验证一次离线可构建。
 
 
 1. **离线命令行**（推荐，不依赖网络）：`python tools/build_cli.py`
-   —— 用 aapt2 + javac + d8 + zipalign + apksigner 打出可安装 APK，产物在 `_build/`。
+   —— 用 aapt2 + kotlinc + d8 + zipalign + apksigner 打出可安装 APK，产物在仓库根
+   `OrekiFrameObserver.apk`（`--unsigned` 时输出到 `_build/`）。
    **完全离线**，不需要 Gradle、不需要网络下载依赖；但**需要上表四样东西**。
 2. **Android Studio / AGP**：直接打开根目录（`com.android.application` 8.7.3）。
    —— 需要**本机可用的 Gradle 环境与网络**（首次要拉 AGP 与依赖），与路径 1 不是一回事：
@@ -292,20 +292,21 @@ K70 面板支持高刷，但本工具在 60 Hz 下运行，任何 120 Hz 结论�
 ## 目录
 
 ```
-app/src/main/java/com/oreki/frameobserver/
-├── MainActivity.java        界面（薄壳，无采集逻辑）
-├── CaptureService.java      采集核心（MediaProjection + ImageReader + 有界队列）
-├── CaptureConfig.java       参数（分辨率降采样在 VirtualDisplay 层完成）
-├── FrameBus.java            进程内总线（最新帧 + 统计）
-├── FrameStats.java          实际 FPS / 丢帧 / 延迟（目标与实际分开报告）
-├── SessionLog.java          JSONL 会话日志
-├── ProcStats.java           CPU / 内存采样（/proc/self/stat + Debug.MemoryInfo）
-├── util/Json.java           极简 JSON 序列化（单行、稳定字段序）
-├── net/FrameHttpServer.java HTTP + WebSocket（零依赖，只绑回环）
+app/src/main/kotlin/com/oreki/frameobserver/
+├── MainActivity.kt          界面（薄壳，无采集逻辑）
+├── CaptureService.kt        采集核心（MediaProjection + ImageReader + 有界队列）
+├── CaptureConfig.kt         参数（分辨率降采样在 VirtualDisplay 层完成）
+├── FrameBus.kt              进程内总线（最新帧 + 统计）
+├── FrameStats.kt            实际 FPS / 丢帧 / 延迟（目标与实际分开报告）
+├── SessionLog.kt            JSONL 会话日志
+├── ProcStats.kt             CPU / 内存采样（/proc/self/stat + Debug.MemoryInfo）
+├── util/Json.kt             极简 JSON 序列化（单行、稳定字段序）
+├── net/FrameHttpServer.kt   HTTP + WebSocket（零依赖，只绑回环）
+├── diag/LogcatRecorder.kt   Logcat 实时捕获与环形缓冲
 └── a11y/
-    ├── A11yBinder.java          无障碍绑定与自愈（写回 enabled_accessibility_services）
-    └── ObserverA11yService.java 事件 + 有界控件树 dump
+    ├── A11yBinder.kt              无障碍绑定与自愈（写回 enabled_accessibility_services）
+    └── ObserverA11yService.kt     事件 + 有界控件树 dump
 tools/
-├── build_cli.py             离线构建（aapt2+javac+d8+zipalign+apksigner）
+├── build_cli.py             离线构建（aapt2+kotlinc+d8+zipalign+apksigner）
 └── soak_test.py             30 分钟 soak 采样与判定
 ```

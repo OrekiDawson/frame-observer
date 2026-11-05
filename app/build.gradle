@@ -11,6 +11,7 @@
  */
 plugins {
     id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
 }
 
 def repoRoot = rootDir
@@ -66,12 +67,27 @@ android {
         }
     }
 
+    // 生产业务实现已全部迁移到 Kotlin（app/src/main/kotlin）。
+    // 只保留 Java 11 作为字节码目标，不再放任何 .java 生产源码。
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_11
         targetCompatibility JavaVersion.VERSION_11
+    }
+    kotlinOptions {
+        jvmTarget = '11'
+    }
+    sourceSets {
+        main {
+            kotlin.srcDirs = ['src/main/kotlin']
+        }
     }
 
     lint {
         abortOnError false
     }
+}
+
+dependencies {
+    // Kotlin 标准库：Kotlin 编译产物必然引用它，必须随 APK 一起打包。
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:2.0.21"
 }
