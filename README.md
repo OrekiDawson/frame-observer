@@ -3,30 +3,35 @@
 为 **反物质维度 Oreki Edition（Android）** 的自动化开发提供的独立画面观测工具。
 它是一个**测试基础设施**：只读取画面与界面事件，不修改游戏、不注入点击、不做任何自动化操作。
 
-- 目标环境：Android 14（API 34）· 真机 **Redmi K70**（Xiaomi `23113RKC6C`，代号 `vermeer`）
-  - 屏幕：**1440×3200**、**560 dpi**、**20:9**
-  - 应用可用区：**1440×2896**（`statusBars` 136 px + `navigationBars` 168 px，3200 − 136 − 168 = 2896）
-- 历史验证环境（早期）：AVD `oreki_test` 1080×2340 @440dpi —— 下面的「已实测数据」表出自这里
-- 依赖：**零第三方依赖**（framework API 手写，无 AndroidX / 无 Kotlin / 无网络库）
-- 体积：约 41 KB
+- **目标环境**：Android 14（API 34）真机，1440×3200 @560dpi（应用可用区 1440×2896）
+- **当前验收环境**：AVD `oreki_test` 1080×2340 @440dpi（本文件所有「实测」数据均出自此环境）
+- 依赖：**零第三方依赖** —— 界面用 framework API 手写，不引 AndroidX、不引网络库；
+  唯一的运行时依赖是 Kotlin 标准库（语言本身）
+- 实现语言：**Kotlin**（`app/src/main/kotlin/`，无 Java 业务源码）
 
 ## 快速开始（本机已验证的流程）
+
+构建前需要：JDK 17+、Android SDK `platforms/android-34`、build-tools（aapt2 / d8 / zipalign / apksigner）、
+Kotlin 编译器（`kotlinc`）。默认从同级 `android/AD_Oreki_Edition_Android/tools/` 取 JDK、build-tools 与
+kotlinc；不在此布局时用 `--sdk` 指定 SDK 根，并保证 `kotlinc` 在 PATH 或按脚本常量调整。
 
 ```bash
 # 1. 构建（完全离线，不需要 Gradle 网络）
 python tools/build_cli.py
-#    产物：OrekiFrameObserver.apk（自动用仓库共享密钥签名）
+#    产物：仓库根 OrekiFrameObserver.apk（自动用签名密钥签名）
+#    --unsigned 时输出到 _build/OrekiFrameObserver-unsigned.apk
 
-# 2. 安装并授权
-adb install -r OrekiFrameObserver.apk
-adb shell pm grant com.oreki.frameobserver android.permission.POST_NOTIFICATIONS
-adb shell am start -n com.oreki.frameobserver/.MainActivity
+# 2. 安装并授权（-s 显式指定设备，多设备时必须写）
+adb devices                                  # 先确认目标序列号
+adb -s emulator-5554 install -r OrekiFrameObserver.apk
+adb -s emulator-5554 shell pm grant com.oreki.frameobserver android.permission.POST_NOTIFICATIONS
+adb -s emulator-5554 shell am start -n com.oreki.frameobserver/.MainActivity
 
 # 3. 在设备上点「开始捕获」→ 系统授权对话框 →「START NOW」
 #    （MediaProjection 授权必须由人确认，工具不提供任何绕过接口）
 
-# 4. WorkBuddy 侧读取
-adb forward tcp:8731 tcp:8731
+# 4. 调用方读取（同样显式指定设备）
+adb -s emulator-5554 forward tcp:8731 tcp:8731
 curl http://127.0.0.1:8731/snapshot.jpg     # 最新一帧 JPEG
 curl http://127.0.0.1:8731/stats            # 统计 JSON
 ```
@@ -231,8 +236,8 @@ K70 面板支持高刷，但本工具在 60 Hz 下运行，任何 120 Hz 结论�
 | 现象 | 原因 | 处理 |
 | --- | --- | --- |
 | `/stats` 里 `capturing=false` | MediaProjection 授权失效（重启 App、系统回收、切后台过久） | 重新走「开始捕获」→ 系统对话框确认；**工具不提供任何绕过授权的接口** |
-| `/ui` 返回 503 `a11y:"missing"` | 无障碍服务未绑定 | 到系统设置里重新开启本应用的无障碍服务；`am force-stop` 会把 `enabled_accessibility_services` 清成 null，必须重新授权 |
-| 冷启动后 `/ui` 首次必 503 | 无障碍服务尚未绑定完成 | 等绑定完成，或先用 `uiautomator dump` 过渡 |
+| `/ui` 返回 503 `a11y:"missing"` | 绑定确实被清空（`am force-stop` 会清 `enabled_accessibility_services`） | 工具会在 `MainActivity.onCreate` 与 `/ui` 失败路径各尝试自愈一次；自愈需要 `WRITE_SECURE_SETTINGS`，未授予时按 `/ui` 返回体里的 `fix` 命令手动授权 |
+| 自愈后仍是 `notconnected` | 系统正在异步绑定，属正常过渡态 | 等 1~2 秒重试；`notconnected` 时工具**不会**再写一次（重复写会打断绑定） |
 | `/ui` 超时（`http=000`） | 控件树较大时响应慢 | 放宽 curl 超时（如 `-m 60`），不要用 5 秒级超时判定失败 |
 | `/ui` 报 `could not get idle state` | 直接用 `uiautomator dump` 抓动画界面时的已知限制 | 改用本工具的 `/ui`（不等待 idle） |
 | 截图与控件坐标对不上 | 画面是**半分辨率**、控件树是**物理分辨率** | 见上文「分辨率口径」一节，按 2 倍换算 |
