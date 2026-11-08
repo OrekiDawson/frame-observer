@@ -315,3 +315,4 @@ tools/
 ├── build_cli.py             离线构建（aapt2+kotlinc+d8+zipalign+apksigner）
 └── soak_test.py             30 分钟 soak 采样与判定
 ```
+R95 起 Linux 是主要开发环境，Windows 11 是兼容环境。Linux 使用原生路径和权限，推荐通过 `--sdk /opt/android-sdk` 指定 SDK；不要把 `/opt/android-sdk` 或 Windows 绝对路径写死进跨机器脚本。当前 Linux 实测工具链版本见统一工作区 `FACTS.md`；本轮未构建或安装 APK。
