@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "kind": "frame-observer-observations",
+  "note": "观测样本清单；本工具不运行游戏，不提供游戏存档",
+  "samples": [],
+  "pending": [
+    "captures/ui-r101-mod-main.json",
+    "captures/snapshot-r101-mod-main.jpg",
+    "captures/stats-r101.json"
+  ]
+}
