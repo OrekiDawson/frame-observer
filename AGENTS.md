@@ -39,4 +39,4 @@
 - Android 新增或修改的游戏业务逻辑仍必须使用 Kotlin；禁止新增 Java/Smali 游戏业务实现。Python 不得替代 Android Kotlin 业务代码。
 - 既有 Python 构建脚本允许必要的维护和 Bug 修复；迁移到 Gradle/Kotlin/Rust 应以实际收益和风险为依据，不强制为迁移而迁移。
 - GitHub 语言统计由 .gitattributes 的 Linguist 属性独立管理；只排除真实的生成或第三方内容，不伪装文件语言，不影响 Git 跟踪与构建。
-- 此规则取代 Python 严格禁增；旧版见 [归档](archive/rules-pre-reset-2026-11-11/python-strict-ban-2026-11-11.md)。
+- 旧版已废止规则见 [归档](archive/rules-pre-reset-2026-11-11/python-strict-ban-2026-11-11.md)。
