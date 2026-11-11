@@ -4,7 +4,7 @@
 - 项目状态：PAUSED（随 AD Mod 项目一并暂停；工具本身可独立使用）
 - 当前轮次：R101（未宣称完成）
 - 封存前 HEAD：a99f832fd5e1b2bfdf89216febbc4a17b070f80b
-- 封存提交：本文件所在提交（`chore: 封存当前开发成果，暂停项目开发`）
+- 封存提交：`077057dd694030fabc90a854d6d71308fc65ab81`（2026-11-11 首次封存）；本文件已在同日规则重建提交中更新。
 - 分支 / 远程：main → <https://github.com/OrekiDawson/frame-observer.git>
 
 ## 当前开发状态

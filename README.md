@@ -25,7 +25,7 @@ Android 真实屏幕观测工具，用于采集截图、帧统计、无障碍控
 ./gradlew assembleDebug --offline --no-daemon --console=plain
 ```
 
-默认包名为 `com.oreki.frameobserver`。签名配置和口令要求以 `app/build.gradle` 与当前规则为准，不把口令写入仓库。
+默认包名为 `com.oreki.frameobserver`。签名配置和口令要求以 `app/build.gradle` 与 [AGENTS.md](AGENTS.md) 为准，不把口令写入仓库。
 
 ## 4. 观测入口
 
