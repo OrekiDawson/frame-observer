@@ -7,6 +7,7 @@
 ## 跨仓统一核心规则入口（强制）
 
 - **单一权威来源**：[Workspace 最新 AGENTS.md](https://github.com/OrekiDawson/AD-Oreki-Edition-Workspace/blob/main/AGENTS.md) 是 ChatGPT/Agent 分工、任务编号与 `/goal`、费用/审查、游戏真实性与五阶段 180 分钟目标、Subagent 调度、GitHub/CI/CD、中文规范及交付的**全项目长期规则**。本仓继承其中适用条款；本仓 `AGENTS.md` 仅补充本平台技术和运行约束，**不得以内容未在本文件逐字重复为由忽略跨仓规则**。
+- **Android 五渠道发布协作（长期强制）**：遵循 [Workspace AGENTS.md](https://github.com/OrekiDawson/AD-Oreki-Edition-Workspace/blob/main/AGENTS.md)，Stable Release 与 Pre-release 均使用 GitHub Releases、OneDrive、Google Drive、小米云盘、本地 SSH/SFTP 五渠道，复用同一签名 APK/SHA-256 及签名要求的配套 idsig/SHA-256；Windows 三家云盘使用官方客户端，不以 rclone 为交付依赖。逐渠道核实实际同步、下载、链接/路径及哈希，部分成功不得宣称五渠道完成；预发布独立路径，不覆盖稳定 latest。Android 为发行责任仓，其他仓仅维护适用引用和证据，不自动取得发布权限。旧四渠道规则以此为准。
 - **业务优先（长期强制）**：遵循 [Workspace AGENTS.md §1.1](https://github.com/OrekiDawson/AD-Oreki-Edition-Workspace/blob/main/AGENTS.md) 的 P0 游戏业务优先规则。全量反编译、全 APK 源码化、Smali 退役及非阻断 AGP/R8/旧构建链迁移为 P1；普通目录和工具链治理为 P2。仅直接阻断 P0 业务、构建、真实验收或安全交付的最小工程闭包临时升 P0。保留 Kotlin-only、源码化长期终局和全部安全、签名、存档、发布门禁，不以源码覆盖率冒充游戏进度。本条覆盖旧轮次相反优先级和一次性迁移时限，不授权接管其他仓库或本机任务。
 - **先读取再执行**：启动、恢复、跨仓交接和关键合并/部署前，按照 Workspace 生效规则核验最新 `origin/main:AGENTS.md`（云端用 GitHub API 可替代只读刷新）、本仓规则、事实、任务书、实际 PR/CI 与运行证据；遵守已有 60 分钟常规刷新和关键动作前的短间隔刷新。读取失败或未证实最新版本时记录 `STALE/BLOCKED`，不能声称已同步。本仓更细的合法技术约束继续有效；**用户最新授权与安全/预算硬限制优先，其他冲突以 Workspace 跨仓规则为准**，发现不可兼容之处只作最小修复并报告，不静默放宽门禁。
 - **运行方式**：当前已启动轮次仅续做，不重新发 `/goal` 或改编号；Agent 输出、人工注释/文档和有意义的 Commit 使用简体中文、LF；按风险做最小必要真实验证，结果如实为 `PASS / FAIL / BLOCKED / NOT RUN`；保护未提交文件、唯一构建/测试证据及 Git worktree，避免重复工具安装和无限临时工作树。不得把文档/CI/规则 PASS 冒充真实游戏、上线或正式发布 PASS。
