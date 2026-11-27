@@ -1,68 +1,45 @@
 # frame-observer · Agent 工作规则
 
-> **历史状态：2026-11-17 曾暂停本仓独立开发。** 不因其他项目恢复、旧轮次或单次规则清理就自动恢复 frame-observer 的新功能、AVD 采集或付费任务。是否允许在当前授权的 Android 真实验证中使用已验收的只读观测能力，须以用户最新实际授权、设备许可、AVD Owner 与工具运行状态逐次核实；历史暂停记录不能充当永久拒绝所有合法单次调用的依据。
->
-> 本文优先于旧轮次说明、旧版 AGENTS 快照和交接文件中的冲突措辞。详细事实按需查阅源码与专题文档；[优化前规则原文](docs/agent-policy/LEGACY_2026-11-17.md) 仅供历史追溯，**不会自动继承为当前指令**。
+> 跨仓共性规则以 [Workspace AGENTS.md](https://github.com/OrekiDawson/AD-Oreki-Edition-Workspace/blob/main/AGENTS.md) 为唯一权威。启动先读该入口、本文件、当前任务与必要事实；涉及对应事项必须先读以下细则适用章节，不默认全文加载所有细则。共享重复条款不作为另一权威来源，最新用户授权与 Workspace 口径优先；根入口的按需加载及 PATH 约定覆盖旧措辞，不降低安全、预算、审查、CI、验收或发布门禁。根 AGENTS.md 目标 100 行、8 KiB，复杂例外说明；规则按主题编号、避免重复，临时任务进 Issue、事实进 FACTS、可机器检查约束进 CI。
 
 ## 跨仓统一核心规则入口（强制）
 
-- **单一权威来源**：[Workspace 最新 AGENTS.md](https://github.com/OrekiDawson/AD-Oreki-Edition-Workspace/blob/main/AGENTS.md) 是 ChatGPT/Agent 分工、任务编号与 `/goal`、费用/审查、游戏真实性与五阶段 180 分钟目标、Subagent 调度、GitHub/CI/CD、中文规范及交付的**全项目长期规则**。本仓继承其中适用条款；本仓 `AGENTS.md` 仅补充本平台技术和运行约束，**不得以内容未在本文件逐字重复为由忽略跨仓规则**。
-- **每三分钟主动汇报（长期强制）**：执行中的主 Agent/Lead 必须按真实墙钟每 3 分钟至少向用户可见的会话或授权渠道反馈一次当前任务、可核实进展、当前动作、阻断及下一步；Subagent 同频向 Lead 汇报，由 Lead 汇总。长构建、测试及等待期间仍应反馈，无新增成果时如实说明。重要阻断、安全风险和任务结束立即反馈；反馈后继续执行，不视为停止或结束 Goal。不得为汇报重复轮询、付费调用或中断运行中的进程；工具无法支持时如实记录限制及超时。暂停或任务结束后停止空心跳。完整口径见 [Workspace AGENTS.md §1.1](https://github.com/OrekiDawson/AD-Oreki-Edition-Workspace/blob/main/AGENTS.md)。
-- **Android 五渠道发布协作（长期强制）**：遵循 [Workspace AGENTS.md](https://github.com/OrekiDawson/AD-Oreki-Edition-Workspace/blob/main/AGENTS.md)，Stable Release 与 Pre-release 均使用 GitHub Releases、OneDrive、Google Drive、小米云盘、本地 SSH/SFTP 五渠道，复用同一签名 APK/SHA-256 及签名要求的配套 idsig/SHA-256；Windows 三家云盘使用官方客户端，不以 rclone 为交付依赖。逐渠道核实 GitHub 上传、各本地路径/哈希及客户端状态，部分成功不得宣称五渠道完成；预发布独立路径，不覆盖稳定 latest。Android 为发行责任仓，其他仓仅维护适用引用和证据，不自动取得发布权限。旧四渠道规则以此为准。
-- **Android 滚动发布协作（长期强制）**：依 Workspace 最新规则，GitHub Releases 保留各版本 Tag/资产作为历史归档；OneDrive、Google Drive、小米云盘、本地 SSH/SFTP 使用固定路径/文件名，按类型滚动替换而非追加，各仅保留最新 Stable 和最新 Pre-release APK 及其必要配套 idsig。两类不得互相覆盖。验证新包、旧版可恢复性、本地交付路径、客户端状态、APK 与 idsig 配对及 SHA-256 后安全回收被替代的项目冗余副本和旧目录；失败保留/恢复上个可用版本并记 BLOCKED，不删除唯一成果、有效回滚点、历史证据、密钥或存档。禁止按 release-id 永久累积云盘/SSH 版本，不改变现有发布权限与门禁。
-- **发布验收以本地交付为准（2026-11-25 用户授权）**：遵循 Workspace 最新五渠道验收口径。GitHub Releases 核实真实上传及资产信息；OneDrive、Google Drive、小米云盘仅核对官方客户端实际同步路径、文件大小、SHA-256、必要 idsig 及登录/可用状态，无已知同步失败即 `PASS（本地交付）`。不强制云端回读、远端下载、二次哈希、云端对象 ID、上传完成日志或内部接口；已知 401/登录失效/同步失败仍 `BLOCKED`，不虚称远端已核验。SSH/SFTP 核对约定本机分发目录及文件哈希、SSH 服务状态，不要求远程回拉或 SFTP 子系统实测；远程传输能力单列。此条覆盖旧远端回读要求，不改变五渠道同一 APK、滚动替换、签名与发行门禁。
-- **六仓开放 PR 总量硬上限 5（长期强制）**：遵循 [Workspace AGENTS.md §4.1](https://github.com/OrekiDawson/AD-Oreki-Edition-Workspace/blob/main/AGENTS.md)。Workspace、Android、Web、Wiki、Pages、frame-observer 合计所有 OPEN PR（含 Draft、Ready、WAITING/BLOCKED、机器人及其他 Owner）最多 5 个；Lead 统一计数和分配预留名额，实际开放数加预留达到 5 即禁止创建/重开，超限 `PR_BACKLOG_BLOCKED`，先修复、合规合并或确认成果已保存后关闭被替代/经 Owner 确认延期的 PR，不为凑数量丢弃独有成果或绕过门禁。计数未知时禁止新增，可继续安全本地开发、现有 PR 修复和验证。低于 5 才分配普通 Agent 新额度，优先 P0 业务，汇报总数/预留及下一收口动作；原 Kody 付费并发、预算、Owner、CI、安全门禁不变。 ChatGPT 授权规则维护名额例外依 Workspace §4.1；实际 OPEN 仍计数，普通 Agent 上限不变。
-- **最新跨仓调度与持续执行（2026-11-26 用户授权）**：以 [Workspace AGENTS.md §1.1–1.2](https://github.com/OrekiDawson/AD-Oreki-Edition-Workspace/blob/main/AGENTS.md) 为权威。取消峰谷、工作日、节假日和固定时段的开发、构建、测试、Git/CI/CD、审查及发布停工限制；全天按真实授权执行。安全、用户暂停、数据保护、真实预算/权限/资源硬门禁 > 六仓既有 PR 实质收口 > 新增 P0/P1 > 普通功能和技术债。未满 5 个也优先收口；只有当前可执行收口项均已推进且剩余受真实外部阻断或用户冻结、不争抢资源时，才转入独立 P0。Lead 不得主动结束回合后空等、因阶段完成、CI/Kody、资源或单一 Provider 阻断全局停工；每三分钟反馈后继续下一项。只有真实全部完成、用户明确暂停/结束或全部任务硬阻断、系统/会话实际中断才安全交接；不绕门禁、不空转、不虚构后台运行。云端定时调度不限制本地时段，共享对象按实际 Owner、HEAD、资源锁和 Issue #20 交接避让。四小时交付全天适用，取消时段豁免，仍以合格候选及安全发布门禁为准；不改变本仓业务、设备、发布及付费权限。
-- **PR 快速流转与满额强制收口（长期强制）**：Issue 是长期任务池，PR 是短期交付队列；未具备独立可审查范围的任务留在 Issue/可恢复分支。六仓所有 OPEN（含 Draft、机器人、WAITING/BLOCKED）日常 0–2 个，3–4 正常，达到 5 即实际收口，超过 5 为 `PR_BACKLOG_BLOCKED`。合并优先于关闭；修复真实审查/CI/冲突，验证并合并有效成果；不得为数字关闭高投入 PR、降低优先级、丢弃成果或另起重复 PR。被替代须有 main 实现及验证，延期/取消须有用户或 Owner 授权及可恢复证据。每次合并/关闭回读六仓总数，满额持续至低于 5；仅报告或等待不是收口，关闭未合并不计交付。Lead 统一预留名额及调度；ChatGPT 直接维护授权的长期规则/任务书同步 PR 不受创建名额限制，仍计入真实 OPEN，其他 Agent 不得借名规避；CI/Kody/Ruleset/预算/Owner 门禁不豁免。
-- **规则继承完整性门禁（长期强制）**：按 [Workspace AGENTS.md §4.1](https://github.com/OrekiDawson/AD-Oreki-Edition-Workspace/blob/main/AGENTS.md) 核对规则 PR 原 HEAD/Diff、有效条款、替代 PR、已合并 Commit、main 文件及条款位置、适用范围和验证证据；逐条确认全部有效约束和必要引用/配置已真实继承后才允许 `SUPERSEDED` 关闭。发现遗漏/冲突标记 `RULE_INHERITANCE_BLOCKED`，修复并回读优先于新增 P0；历史未合并规则按主题去重核查，不恢复已废止规则、不机械重开、不重复付费审查。逐仓区分权威已生效、仓内 main 合并、平台执行及本机同步，不以一仓合并冒充六仓完成。
-- **Windows PowerShell 执行入口（2026-11-25 用户长期要求）**：Windows 原生会话中的所有 PowerShell 命令、脚本、MCP 工具调用、维护任务和交接示例统一使用 PowerShell 7+ 的 `pwsh`，禁止使用 Windows PowerShell `powershell.exe`。调用文件时采用 `pwsh -NoProfile -File <path>` 或等价显式入口；工具发现、PATH、文档示例和自动化不得回退到 `powershell.exe`。仅第三方程序内部不可控的兼容层可如实记录例外，不得把该例外扩展为 Agent 的默认入口。
-- **完整日志落盘、失败根因优先（长期强制）**：关键构建、测试、签名、反编译、部署命令事先安排完整 stdout/stderr 日志或原生完整报告，保留真实退出码、脱敏命令、时间、HEAD、任务和日志路径；会话成功输出可精简，禁止仅凭 `Select-Object -Last 3`、`tail` 或过滤输出留证，pwsh 原生命令结束立即捕获 `$LASTEXITCODE`，其他 shell 同样保留生产命令真实退出码。失败先读取首次有意义的错误、失败任务/用例、文件行号和必要异常上下文，查已有 Gradle/test-results 等报告，区分根因与连带失败；无新修复、新假设或环境恢复不得原样重复执行。关键证据不可恢复时允许一次有明确目的且完整记录的最小复现。按需读取摘要与相关片段以节省 Token，不泄露凭据/存档等敏感内容；遵守磁盘配额，回收冗余但保留唯一失败和验收证据。适用本地及 CI；不改变真实门禁。
-- **全局资源与安全同步（长期强制）**：遵循 Workspace §2.1、§5.1、§5.3 及专项生命周期规范。项目数据合计 80 GiB 硬上限，64 GiB 预警并安全回收，72 GiB 或预计超过额度时优先回收并暂缓重型写入，80 GiB 或配额拒绝停止新增写入、保全成果、清理；低于 64 GiB 且满足其他门禁时恢复。必须核实实际硬配额，不凭文档宣称 PASS。主树在安全检查点 clean/快进，保护 WIP、密钥、存档、唯一证据和活动 Owner；已合并且无独有内容/活动引用的工作树安全释放。启动/恢复及距上次刷新 60 分钟核对六仓 main 与有效规则；关键操作核对最新 HEAD、Owner，超过 10 分钟按最小范围刷新。远端合并不等于本机同步。
-- **业务优先（新增开发任务内部排序）**：遵循 [Workspace AGENTS.md §1.1](https://github.com/OrekiDawson/AD-Oreki-Edition-Workspace/blob/main/AGENTS.md) 的新增开发内部 P0 游戏业务优先规则，既有 PR 收口仍在其前。全量反编译、全 APK 源码化、Smali 退役及非阻断 AGP/R8/旧构建链迁移为 P1；普通目录和工具链治理为 P2。仅直接阻断 P0 业务、构建、真实验收或安全交付的最小工程闭包临时升 P0。保留 Kotlin-only、源码化长期终局和全部安全、签名、存档、发布门禁，不以源码覆盖率冒充游戏进度。本条覆盖旧轮次相反优先级和一次性迁移时限，不授权接管其他仓库或本机任务。
-- **先读取再执行**：启动、恢复、跨仓交接和关键合并/部署前，按照 Workspace 生效规则核验最新 `origin/main:AGENTS.md`（云端用 GitHub API 可替代只读刷新）、本仓规则、事实、任务书、实际 PR/CI 与运行证据；遵守已有 60 分钟常规刷新和关键动作前的短间隔刷新。读取失败或未证实最新版本时记录 `STALE/BLOCKED`，不能声称已同步。本仓更细的合法技术约束继续有效；**用户最新授权与安全/预算硬限制优先，其他冲突以 Workspace 跨仓规则为准**，发现不可兼容之处只作最小修复并报告，不静默放宽门禁。
-- **运行方式**：当前已启动轮次仅续做，不重新发 `/goal` 或改编号；Agent 输出、人工注释/文档和有意义的 Commit 使用简体中文、LF；按风险做最小必要真实验证，结果如实为 `PASS / FAIL / BLOCKED / NOT RUN`；保护未提交文件、唯一构建/测试证据及 Git worktree，避免重复工具安装和无限临时工作树。不得把文档/CI/规则 PASS 冒充真实游戏、上线或正式发布 PASS。
-- **本机资源保护与生命周期（长期强制）**：遵守 [Workspace AGENTS.md §2.1、§5.1、§5.3](https://github.com/OrekiDawson/AD-Oreki-Edition-Workspace/blob/main/AGENTS.md) 与 [Git 工作树生命周期规范](https://github.com/OrekiDawson/AD-Oreki-Edition-Workspace/blob/main/项目管理/Git工作树生命周期规范.md)。本机开发启动前核实实际 CPU/RAM/Swap/I/O/磁盘余量、cgroup 预算与唯一重型任务许可；重型构建、反编译、AVD、浏览器长跑、Timeshift 创建/清理不得重叠，保护桌面、网络与远程救援，压力异常先暂停新增负载，不自动重试失控任务。当前轮次若有资源硬门禁，须以真实验收及用户授权解除，不能以重启或文档合并代替。Subagent/Owner 任务完成、取消或替代后先保存独有成果、WIP 与证据，再实际回收安全的工作树与无引用临时生成物；Lead 交接/收尾核对主检出及全部 worktree、实际释放空间。禁止强制 remove/reset/clean、跨 Owner 删除、清空在用缓存或从 Windows 第三方 ext4 驱动批量清理；正式资产与有效回滚点只读保护。具体阈值由 Workspace 与当前任务书管理，不在本仓另设独立预算。本仓仅在当前用户授权与设备 Owner 允许时使用观测工具；采集任务纳入统一资源预算，保留真实故障样本及必要证据，清理可再生且无引用的过期采集输出，不误删 AVD userdata、存档或其他 Owner 的数据。历史暂停/独立开发权限不变。
+- 继承 Workspace 共性规则。历史暂停不自动解除；单次已授权 Android 只读观测按当前设备权限、Owner 和实际状态核验，不等于允许独立新开发。
+- 详细口径：[执行细则 1](docs/agent-policy/执行细则-01.md)。
 
-- **屏幕观测专属继承重点**：仅按当前设备/Owner 授权只读观测 AVD/真机，保留设备端屏幕/无障碍权限与隐私门禁；不得把游戏核心修复授权误认成自动允许新采集、注入操作或独立功能开发；共享 AVD 独占，保留原有 API 与可核验截图/日志证据。
 
 
 ## 1. 先确认权限、预算与运行状态
 
-- **最小授权与安全边界**：新功能开发、正式采集、AVD/设备占用、自动任务和付费审查各自需要对应的当前授权，不从别仓 R124 自动推导全面复工。仅在用户已批准的真实游戏测试中、设备端显式授权且 Owner/隐私门禁通过时，可以使用现有只读观测能力；不注入输入、不采集未授权屏幕或敏感内容。收费前须确认人民币预算、期限、Provider 实际可用性，未知则不发起收费。单次文档操作不构成长期开发授权。
-- **付费门禁（最新授权）**：遵循 Workspace 权威规则：取消 DeepSeek 固定余额和余额未知的停工/付费前置门禁，余额仅供参考；实际 Provider 拒绝请求时仅阻断对应付费路径，不暂停无关已授权任务。周期预算 80% 预警、100% 或预计超额停止新增收费任务，保留真实授权、有效凭据、安全、Kody 额度及现行权限门禁；不得自行充值、重建密钥或切换账号/Provider 绕限。
-- **费用归因**：区分 DeepSeek Harness **账号登录态**、API Key 与 Kodus BYOK；依据真实账单记录金额、调用与有效修复，不把某个 Key 的全部费用武断归给 Kody。规则文件不是云端扣费上限，云端 Provider/订阅/自动审查需在平台侧独立停用。
-- **费用与连续执行**：费用按实际 Provider、用量及授权周期预算记录，不再按峰谷、工作日或时段限制执行；未完成 Goal 如实记录，不伪记 complete。
+- 仅在当前用户授权、设备许可、AVD Owner 与安全预算满足时工作；不擅自启动采集、AVD、构建、长跑或收费。
+- 详细口径：[执行细则 2](docs/agent-policy/执行细则-02.md)。
+
+
 
 ## 2. 质量与 GitHub 合并门禁
 
-- 先读相关源码/配置/事实，按风险做**最小必要修改与验证**。构建成功、CI 绿色、截图、模型自评都不能代替真实游戏/功能验收；未运行写 `NOT RUN`，失败写 `FAIL`，受阻写 `BLOCKED`，仅有证据才写 `PASS`。文档单改不机械做游戏长跑。
-- 使用受保护分支、PR、Required Checks、签名/发布审批。不得强推、关闭 Ruleset、跳过 CI/人工审批或伪造验证。真实 Critical/P0/P1、阻塞性 Medium 必须修复或证据充分地判定误报；非阻塞意见记录合理处置。
-- **审查信息读取**：合并前同时检查 PR 普通评论、Reviews、Review Threads、最新 HEAD SHA、Checks；所有需解决的线程归零。Kody 无可用 Provider 出现 `Skipped` / `BYOK Configuration Required` 表示 **KODY NOT RUN**，不是 PASS；不因缺密钥自行重接 Provider，也不制造空 Commit 或重复触发收费审查。
-- 原有要求 Kody 覆盖最终 HEAD 的业务 PR 保持 `BLOCKED` 直到门禁满足。用户**明确逐次授权**的纯文档维护可以按该次批准范围处理审查缺失，但必须保留记录、确保 GitHub 平台 Required Checks 与权限允许；不得推广成任何业务/生产 PR 的常规豁免。
-- **纯 AGENTS.md Kody skipped 例外**：仅适用 Workspace §4.1.1 的已确认官方规则文件 skip；同一 HEAD/配置不重复付费，不把 skipped 当 PASS。当前 HEAD 的其他 Required Checks、审批、Ruleset、冲突及线程门禁满足后才合并；官方原因不明、Kody 强制检查不满足或服务故障仍 BLOCKED，不推广到业务或其他文件。
-- 只有授权开发会话内才主动处理 Issues/PR；不轮询空任务、不启用未经批准的持续监控或夜间 Agent。Kody 如需重启仅限已批准预算下的 Balanced/最少必要审查，不使用 Heavy。
+- 当前 HEAD 的适用 CI、Kody、Ruleset、线程、授权门禁按 Workspace 与本仓细则核验；纯 AGENTS.md 官方 skipped 例外不适用于包含细则的 PR。
+- 详细口径：[执行细则 3](docs/agent-policy/执行细则-03.md)。
+
+
 
 ## 3. 项目技术边界
 
-- 本仓独立观测真实设备画面、帧率、MediaProjection、无障碍控件树、事件和 logcat；**只观测，不注入点击、不修改游戏 APK、不操纵存档**。
-- 屏幕投影、无障碍授权由用户在设备端明确授予；禁止绕过 `FLAG_SECURE`、远程静默授权或扩大采集白名单；对密码框与用户敏感内容脱敏。
-- 保持 Kotlin、Android SDK 和现有 `/stats`、`/snapshot.jpg`、`/ui`、`/events`、`/timeline`、`/logcat` 等接口兼容，变化需更新 [docs/接口说明.md](docs/接口说明.md)。
-- 真实截图、控件树、日志须与设备、APK SHA-256、时间、操作前后状态关联；控件树“存在”不代表视觉可见；测试记录 `PASS/FAIL/BLOCKED/NOT RUN`。
-- 共享 AVD 独占使用，不强停/清除其他任务进程、转发或存档。休眠期间不启动屏幕采集、AVD、构建与长跑。
+- 只观测真实设备画面、帧率、MediaProjection、无障碍树、事件、logcat，不注入点击、不修改游戏 APK、不操纵存档。投影/无障碍由用户设备端明确授权，禁止绕过 FLAG_SECURE、静默授权或扩大白名单，敏感内容脱敏。保持 Kotlin、Android SDK 及现有接口兼容，实际截图/日志与设备、APK SHA-256、时间、操作状态关联；共享 AVD 独占。
+- 详细口径：[执行细则 4](docs/agent-policy/执行细则-04.md)。
+
+
 
 ## 4. 工作方式与文档卫生
 
-- **Coreutils 优先（全局长期强制）**：能以 GNU Coreutils 或常规 Shell 工具安全、可靠、简洁地完成的操作，必须优先使用这些工具，不得改用 Node.js 或新增 JS/MJS/TS、npm 依赖来重复实现。文件操作、遍历、过滤、排序、去重、统计、哈希及批量处理优先采用 `cp`、`mv`、`sort`、`uniq`、`cut`、`wc`、`sha256sum`、`find`、`grep`、`sed`、`awk`、`jq` 等；结构化数据使用可靠解析工具，不以脆弱正则替代。仅在任务确实依赖 JavaScript 运行时、业务逻辑、前端构建、Quartz、Playwright 或相关生态 API，或系统工具方案无法可靠满足兼容性、安全性与维护性时使用 Node.js，并说明必要性。新增及修改脚本遵循本规则，既有非业务脚本按需增量替换，不为迁移破坏现有功能、跨平台兼容、数据安全或构建链。
+- Coreutils/Shell 优先，PATH 命令名（Windows pwsh）；按范围最小验证、完整日志、保护 WIP，不造证据。
+- 详细口径：[执行细则 5](docs/agent-policy/执行细则-05.md)。
 
-- 尽量复用已有任务、索引、证据与历史失败记录；不要无意义全量反编译、跨仓同步、重复大上下文调用、重复构建或等待轮询。并行 Agent 严格隔离文件与独占资源，使用实际可用的交接机制，不假设后台自动运行。
-- 中文为默认文档、PR/Issue 正文及有意义代码注释语言；标识符、API、协议、路径、原文错误消息保留准确拼写。只解释必要的意图/边界，不为中文化重写第三方或生成代码。
-- README 供读者使用，`AGENTS.md` 只保留常驻执行约束；专题技术手册、历史决策、日记、临时轮次放入 `docs/`。新增常驻规则前先合并/替换旧条款，避免重复和矛盾；建议根规则保持 **12 KiB 以下**。
-- 历史任务编号、提交、原始证据和已发布产物不因规则优化而重写；本文件与相应专题文档冲突时遵循最新用户授权、冻结/预算/安全门禁及本文件的明确状态优先级。
+
 
 ## 5. 任务编号唯一分配权
 
-- ChatGPT 是所有项目任务编号的唯一分配者。
-- Lead 只能使用 ChatGPT 已明确分配的编号；Subagent 继承当前编号；Codex、DeepSeek、其他 Agent、调度器和 GitHub Actions 不得自行创建、推算、递增或生成编号。
-- 新任务只用单层 `R整数`；禁止新增子编号。用户说继续时沿用当前编号。
-- `R121-01` 仅为历史兼容编号，保留旧任务和原始证据，不表示当前执行中的开发轮次，也不允许生成新子编号。
-- 所有历史编号、提交和证据保持原样；下一轮编号只由 ChatGPT 明确分配。
+- 仅 ChatGPT 分配任务编号；继承现有任务，不重复开启 /goal 或重置计时。
+- 详细口径：[执行细则 6](docs/agent-policy/执行细则-06.md)。
+
+
